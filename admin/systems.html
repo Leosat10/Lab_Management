@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Systems | LMS </title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/lab-grid.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS ADMIN</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="labs.html" class="nav-item">
+                    <i data-lucide="flask-conical" class="i-icon"></i> Labs
+                </a>
+                <a href="systems.html" class="nav-item active">
+                    <i data-lucide="monitor" class="i-icon"></i> Systems
+                </a>
+                <a href="accounts.html" class="nav-item">
+                    <i data-lucide="users" class="i-icon"></i> Accounts
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="flex items-center">
+                    <button class="menu-toggle" id="menu-toggle"><i data-lucide="menu"></i></button>
+                    <h2 class="topbar-title">Manage Systems</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="lab-selector" class="text-secondary" style="font-size: 0.9rem;">Select Lab:</label>
+                    <select id="lab-selector" class="form-control" style="width: 250px;">
+                        <option value="">-- Select a Lab --</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="export-csv-btn" class="btn btn-outline flex items-center gap-1">
+                        <i data-lucide="download" class="i-icon"></i> Export CSV
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <div class="legend-bar">
+                    <div class="legend-item">
+                        <div class="legend-color color-working"></div> Working
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-complaint"></div> Complaint
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-in_progress"></div> In-Progress
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-waiting"></div> Waiting
+                    </div>
+                </div>
+
+                <div id="grid-container" class="grid-container">
+                    <!-- Grid rendered by JS -->
+                </div>
+
+                <div id="lab-stats" class="mt-3 flex gap-3 text-secondary" style="display: none;">
+                    <span>Total Systems: <strong id="total-count">0</strong></span>
+                    <span>Working: <strong id="working-count" class="text-success">0</strong></span>
+                    <span>Complaints: <strong id="complaint-count" class="text-danger">0</strong></span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- System Modal -->
+    <div class="modal-overlay" id="system-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">System Details</h3>
+                <button class="btn-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="system-form">
+                    <input type="hidden" id="system-id">
+                    <input type="hidden" id="pos-row">
+                    <input type="hidden" id="pos-col">
+                    <div class="form-group">
+                        <label for="serial-number">Serial Number</label>
+                        <input type="text" id="serial-number" class="form-control" placeholder="SN-123456" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="brand">Brand</label>
+                        <input type="text" id="brand" class="form-control" placeholder="HP, Dell, Apple...">
+                    </div>
+                    <div class="form-group">
+                        <label for="model">Model</label>
+                        <input type="text" id="model" class="form-control" placeholder="OptiPlex, iMac...">
+                    </div>
+                    <div class="form-group">
+                        <label for="status">System Status</label>
+                        <select id="status" class="form-control">
+                            <option value="working">Working</option>
+                            <option value="complaint">Complaint Reported</option>
+                            <option value="in_progress">In-Progress (Fixing)</option>
+                            <option value="waiting">Waiting (Parts/Help)</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="delete-system-btn"
+                    style="margin-right: auto; display: none;">Delete</button>
+                <button class="btn btn-outline" id="cancel-modal">Cancel</button>
+                <button class="btn btn-primary" id="save-system-btn">Save System</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showToast, showLoader, hideLoader, confirmDialog, setupMobileMenu } from '../js/utils.js';
+
+        let currentLab = null;
+        let labSystems = [];
+
+        async function init() {
+            const user = await checkAuth('admin');
+            if (!user) return;
+
+            setupMobileMenu();
+
+            fetchLabs();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const labId = urlParams.get('lab_id');
+            if (labId) {
+                // Wait for labs to load then select
+                setTimeout(() => {
+                    const selector = document.getElementById('lab-selector');
+                    selector.value = labId;
+                    handleLabSelect(labId);
+                }, 500);
+            }
+        }
+
+        async function fetchLabs() {
+            const { data } = await db.from('labs').select('id, name').order('name');
+            if (data) {
+                const selector = document.getElementById('lab-selector');
+                data.forEach(lab => {
+                    const opt = document.createElement('option');
+                    opt.value = lab.id;
+                    opt.textContent = lab.name;
+                    selector.appendChild(opt);
+                });
+            }
+        }
+
+        async function handleLabSelect(labId) {
+            if (!labId) {
+                document.getElementById('grid-container').innerHTML = '';
+                document.getElementById('lab-stats').style.display = 'none';
+                return;
+            }
+
+            showLoader();
+            const { data: lab } = await db.from('labs').eq('id', labId).single();
+            const { data: systems } = await db.from('systems').eq('lab_id', labId);
+
+            currentLab = lab;
+            labSystems = systems || [];
+            renderGrid();
+            updateStats();
+            hideLoader();
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('grid-container');
+            container.style.gridTemplateColumns = `repeat(${currentLab.total_cols}, 110px)`;
+
+            import('../js/utils.js').then(utils => {
+                let html = '';
+                for (let r = 0; r < currentLab.total_rows; r++) {
+                    for (let c = 0; c < currentLab.total_cols; c++) {
+                        const system = labSystems.find(s => s.position_row === r && s.position_col === c);
+                        if (system) {
+                            html += `
+                                <div class="grid-cell occupied status-${system.status}" data-row="${r}" data-col="${c}" data-id="${system.id}">
+                                    <div class="cell-icon"><i data-lucide="monitor" class="i-icon"></i></div>
+                                    <div class="cell-label">${utils.escapeHTML(system.serial_number)}</div>
+                                </div>
+                            `;
+                        } else {
+                            html += `
+                                <div class="grid-cell" data-row="${r}" data-col="${c}">
+                                    <div class="cell-icon">+</div>
+                                    <div class="cell-label">Empty</div>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+                container.innerHTML = html;
+                lucide.createIcons();
+
+                container.querySelectorAll('.grid-cell').forEach(cell => {
+                    cell.addEventListener('click', () => openModal(cell.dataset.row, cell.dataset.col, cell.dataset.id));
+                });
+            });
+        }
+
+        function updateStats() {
+            const stats = document.getElementById('lab-stats');
+            stats.style.display = 'flex';
+            document.getElementById('total-count').textContent = labSystems.length;
+            document.getElementById('working-count').textContent = labSystems.filter(s => s.status === 'working').length;
+            document.getElementById('complaint-count').textContent = labSystems.filter(s => s.status !== 'working').length;
+        }
+
+        const modal = document.getElementById('system-modal');
+        const form = document.getElementById('system-form');
+
+        function openModal(row, col, id = null) {
+            document.getElementById('pos-row').value = row;
+            document.getElementById('pos-col').value = col;
+            document.getElementById('system-id').value = id || '';
+
+            const deleteBtn = document.getElementById('delete-system-btn');
+
+            if (id) {
+                document.getElementById('modal-title').textContent = 'Edit System';
+                const system = labSystems.find(s => s.id === id);
+                document.getElementById('serial-number').value = system.serial_number;
+                document.getElementById('brand').value = system.brand || '';
+                document.getElementById('model').value = system.model || '';
+                document.getElementById('status').value = system.status;
+                deleteBtn.style.display = 'block';
+            } else {
+                document.getElementById('modal-title').textContent = 'Add System to Cell';
+                form.reset();
+                document.getElementById('status').value = 'working';
+                deleteBtn.style.display = 'none';
+            }
+            modal.classList.add('active');
+        }
+
+        async function saveSystem() {
+            const id = document.getElementById('system-id').value;
+            const payload = {
+                lab_id: currentLab.id,
+                serial_number: document.getElementById('serial-number').value.trim(),
+                brand: document.getElementById('brand').value.trim(),
+                model: document.getElementById('model').value.trim(),
+                status: document.getElementById('status').value,
+                position_row: parseInt(document.getElementById('pos-row').value),
+                position_col: parseInt(document.getElementById('pos-col').value)
+            };
+
+            showLoader();
+            let result;
+            if (id) {
+                result = await db.from('systems').update(payload).eq('id', id);
+            } else {
+                result = await db.from('systems').insert(payload);
+            }
+
+            if (!result.error) {
+                showToast(`System saved successfully!`, 'success');
+                modal.classList.remove('active');
+                handleLabSelect(currentLab.id);
+            } else {
+                showToast(result.error.message, 'danger');
+            }
+            hideLoader();
+        }
+
+        async function deleteSystem() {
+            const id = document.getElementById('system-id').value;
+            if (confirmDialog('Remove this system from the lab?')) {
+                showLoader();
+                const { error } = await db.from('systems').delete().eq('id', id);
+                if (!error) {
+                    showToast('System removed!', 'success');
+                    modal.classList.remove('active');
+                    handleLabSelect(currentLab.id);
+                } else {
+                    showToast(error.message, 'danger');
+                }
+                hideLoader();
+            }
+        }
+
+        async function exportToCSV() {
+            if (!currentLab) {
+                showToast('Please select a lab first', 'warning');
+                return;
+            }
+
+            const exportData = labSystems.map(s => ({
+                'Serial Number': s.serial_number,
+                'Lab': currentLab.name,
+                'Brand': s.brand || 'N/A',
+                'Model': s.model || 'N/A',
+                'Status': s.status.toUpperCase(),
+                'Position': `R${s.position_row + 1} C${s.position_col + 1}`
+            }));
+
+            import('../js/utils.js').then(utils => {
+                utils.downloadCSV(exportData, `system_health_${currentLab.name.replace(/\s+/g, '_')}`);
+            });
+        }
+
+        document.getElementById('export-csv-btn').addEventListener('click', exportToCSV);
+        document.getElementById('lab-selector').addEventListener('change', (e) => handleLabSelect(e.target.value));
+        document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('active'));
+        document.getElementById('cancel-modal').addEventListener('click', () => modal.classList.remove('active'));
+        document.getElementById('save-system-btn').addEventListener('click', saveSystem);
+        document.getElementById('delete-system-btn').addEventListener('click', deleteSystem);
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Reports | LMS</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="report.html" class="nav-item">
+                    <i data-lucide="alert-triangle" class="i-icon"></i> Report Issue
+                </a>
+                <a href="my-complaints.html" class="nav-item active">
+                    <i data-lucide="clipboard-list" class="i-icon"></i> My Reports
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h2 class="topbar-title">My Reported Issues</h2>
+            </header>
+
+            <div class="content-body">
+                <div class="table-card">
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>System</th>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="my-complaints-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-secondary">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Complaint Modal -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Complaint Detail</h3>
+                <button class="btn-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="detail-body">
+                <!-- Content -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { formatDate, showLoader, hideLoader, escapeHTML } from '../js/utils.js';
+
+        let currentUser = null;
+
+        async function init() {
+            currentUser = await checkAuth('student');
+            if (!currentUser) return;
+            fetchMyComplaints();
+        }
+
+        async function fetchMyComplaints() {
+            showLoader();
+            const { data } = await db
+                .from('complaints')
+                .eq('student_id', currentUser.id)
+                .order('created_at', { ascending: false });
+
+            const tbody = document.getElementById('my-complaints-body');
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary">You haven\'t reported any issues yet.</td></tr>';
+            } else {
+                tbody.innerHTML = data.map(c => `
+                    <tr>
+                        <td>${formatDate(c.created_at)}</td>
+                        <td>
+                            <div>${c.systems && c.systems.labs ? c.systems.labs.name : 'N/A'}</div>
+                            <div class="text-secondary small">SN: ${c.systems ? c.systems.serial_number : 'N/A'}</div>
+                        </td>
+                        <td>${c.title}</td>
+                        <td><span class="badge badge-${getStatusClass(c.status)}">${c.status.replace('_', ' ')}</span></td>
+                        <td><button class="btn btn-sm btn-outline view-btn" data-id="${c.id}">View</button></td>
+                    </tr>
+                `).join('');
+
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.onclick = () => showDetail(btn.dataset.id);
+                });
+            }
+            hideLoader();
+        }
+
+        async function showDetail(id) {
+            showLoader();
+            const { data: comp } = await db.from('complaints').eq('id', id).single();
+            if (comp) {
+                const body = document.getElementById('detail-body');
+                body.innerHTML = `
+                    <div class="mb-3">
+                        <h4 class="mb-1">${comp.title}</h4>
+                        <span class="badge badge-info">${comp.category}</span>
+                        <span class="badge badge-${getStatusClass(comp.status)}">${comp.status}</span>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-secondary font-bold">Description:</p>
+                        <p>${comp.description}</p>
+                    </div>
+                    <div class="p-20 bg-secondary radius-8">
+                        <p class="font-bold mb-1">Status Update:</p>
+                        <p class="text-secondary">${comp.resolution_notes || 'No updates yet. Committee is reviewing it.'}</p>
+                    </div>
+                `;
+                document.getElementById('detail-modal').classList.add('active');
+            }
+            hideLoader();
+        }
+
+        function getStatusClass(s) {
+            if (s === 'open') return 'danger';
+            if (s === 'in_progress') return 'warning';
+            if (s === 'resolved') return 'success';
+            return 'info';
+        }
+
+        document.getElementById('close-modal').onclick = () => document.getElementById('detail-modal').classList.remove('active');
+        document.getElementById('close-btn').onclick = () => document.getElementById('detail-modal').classList.remove('active');
+        document.getElementById('logout-btn').onclick = signOut;
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

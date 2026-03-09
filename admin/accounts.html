@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Accounts | LMS</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS ADMIN</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="labs.html" class="nav-item">
+                    <i data-lucide="flask-conical" class="i-icon"></i> Labs
+                </a>
+                <a href="systems.html" class="nav-item">
+                    <i data-lucide="monitor" class="i-icon"></i> Systems
+                </a>
+                <a href="accounts.html" class="nav-item active">
+                    <i data-lucide="users" class="i-icon"></i> Accounts
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="flex items-center">
+                    <button class="menu-toggle" id="menu-toggle"><i data-lucide="menu"></i></button>
+                    <h2 class="topbar-title">Manage Accounts</h2>
+                </div>
+                <button id="add-account-btn" class="btn btn-primary"><i data-lucide="user-plus" class="i-icon"></i> Add
+                    Committee</button>
+            </header>
+
+            <div class="content-body">
+                <div class="table-card mt-3">
+                    <div class="card-header">
+                        <h3>Committee & Students</h3>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Full Name</th>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Details</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accounts-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-secondary">Loading accounts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Account Modal -->
+    <div class="modal-overlay" id="account-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Add Committee Account</h3>
+                <button class="btn-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="account-form">
+                    <input type="hidden" id="account-id">
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" class="form-control" placeholder="Prof. Name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" class="form-control" placeholder="Unique username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <select id="role" class="form-control">
+                            <option value="committee">Committee / Lab Incharge</option>
+                            <option value="admin">Secondary Admin</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancel-modal">Cancel</button>
+                <button class="btn btn-primary" id="save-account-btn">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut, signUp } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showToast, showLoader, hideLoader, confirmDialog, setupMobileMenu } from '../js/utils.js';
+
+        async function init() {
+            const user = await checkAuth('admin');
+            if (!user) return;
+
+            setupMobileMenu();
+            fetchAccounts();
+        }
+
+        async function fetchAccounts() {
+            showLoader();
+            // Get all profiles except the root admin
+            const { data, error } = await db.from('profiles').neq('username', 'AdminCSE');
+            const tbody = document.getElementById('accounts-body');
+
+            if (data) {
+                import('../js/utils.js').then(utils => {
+                    tbody.innerHTML = data.map(u => `
+                        <tr>
+                            <td class="font-medium">${utils.escapeHTML(u.full_name)}</td>
+                            <td>${utils.escapeHTML(u.username)}</td>
+                            <td><span class="badge badge-${u.role === 'admin' ? 'danger' : (u.role === 'committee' ? 'warning' : 'info')}">${u.role}</span></td>
+                            <td class="text-secondary small">${utils.escapeHTML(u.roll_number || 'N/A')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline text-danger delete-user" data-id="${u.id}">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    tbody.querySelectorAll('.delete-user').forEach(btn => {
+                        btn.addEventListener('click', () => deleteUser(btn.dataset.id));
+                    });
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No accounts found.</td></tr>';
+            }
+            hideLoader();
+        }
+
+        const modal = document.getElementById('account-modal');
+        const form = document.getElementById('account-form');
+
+        document.getElementById('add-account-btn').addEventListener('click', () => {
+            form.reset();
+            document.getElementById('modal-title').textContent = 'Add Committee Account';
+            modal.classList.add('active');
+        });
+
+        document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('active'));
+        document.getElementById('cancel-modal').addEventListener('click', () => modal.classList.remove('active'));
+
+        document.getElementById('save-account-btn').addEventListener('click', async () => {
+            const fullName = document.getElementById('fullName').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const role = document.getElementById('role').value;
+
+            if (!fullName || !username || !password) {
+                showToast('Please fill all fields', 'warning');
+                return;
+            }
+
+            showLoader();
+            const result = await signUp(username, password, fullName, role);
+            if (result.success) {
+                modal.classList.remove('active');
+                fetchAccounts();
+            }
+            hideLoader();
+        });
+
+        async function deleteUser(id) {
+            if (confirmDialog('Permanently delete this account?')) {
+                showLoader();
+                const { error } = await db.from('profiles').delete().eq('id', id);
+                if (!error) {
+                    showToast('Account deleted', 'success');
+                    fetchAccounts();
+                } else {
+                    showToast(error.message, 'danger');
+                }
+                hideLoader();
+            }
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

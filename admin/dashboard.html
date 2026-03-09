@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | LMS</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS ADMIN</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item active">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="labs.html" class="nav-item">
+                    <i data-lucide="flask-conical" class="i-icon"></i> Labs
+                </a>
+                <a href="systems.html" class="nav-item">
+                    <i data-lucide="monitor" class="i-icon"></i> Systems
+                </a>
+                <a href="accounts.html" class="nav-item">
+                    <i data-lucide="users" class="i-icon"></i> Accounts
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="flex items-center">
+                    <button class="menu-toggle" id="menu-toggle"><i data-lucide="menu"></i></button>
+                    <h2 class="topbar-title">Overview</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="export-btn" class="btn btn-sm btn-outline"><i data-lucide="download" class="i-icon"></i>
+                        Export Backup</button>
+                    <button id="import-btn" class="btn btn-sm btn-outline"><i data-lucide="upload" class="i-icon"></i>
+                        Import Backup</button>
+                    <input type="file" id="import-file" style="display: none;" accept=".json">
+                    <div class="user-profile ml-2">
+                        <span id="user-name" class="text-secondary">Admin User</span>
+                        <div class="user-avatar" id="user-initials">AD</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Total Labs</span>
+                            <span class="stat-value" id="stat-labs">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="flask-conical" class="i-icon"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Total Systems</span>
+                            <span class="stat-value" id="stat-systems">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="monitor" class="i-icon"></i></div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-info">
+                            <span class="stat-label">Open Complaints</span>
+                            <span class="stat-value" id="stat-complaints">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="alert-triangle" class="i-icon"></i></div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-info">
+                            <span class="stat-label">Resolved Today</span>
+                            <span class="stat-value" id="stat-resolved">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="check-circle" class="i-icon"></i></div>
+                    </div>
+                </div>
+
+                <div class="table-card mt-3">
+                    <div class="card-header">
+                        <h3>Recent Complaints</h3>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Serial #</th>
+                                    <th>Title</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-complaints-body">
+                                <tr>
+                                    <td colspan="6" class="text-center text-secondary">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { formatDate, showToast, showLoader, hideLoader, setupMobileMenu, escapeHTML } from '../js/utils.js';
+
+        async function init() {
+            const user = await checkAuth('admin');
+            if (!user) return;
+
+            setupMobileMenu();
+
+            document.getElementById('user-name').textContent = user.full_name;
+            document.getElementById('user-initials').textContent = user.full_name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+            fetchStats();
+            fetchRecentComplaints();
+        }
+
+        async function fetchStats() {
+            try {
+                const { count: labCount } = await db.from('labs').select('*', { count: 'exact' });
+                const { count: systemCount } = await db.from('systems').select('*', { count: 'exact' });
+                const { count: complaintCount } = await db.from('complaints').eq('status', 'open').then(res => res);
+
+                const today = new Date().toISOString().split('T')[0];
+                const { count: resolvedCount } = await db.from('complaints').eq('status', 'resolved').then(res => ({
+                    count: res.data.filter(c => c.resolved_at && c.resolved_at.startsWith(today)).length
+                }));
+
+                document.getElementById('stat-labs').textContent = labCount || 0;
+                document.getElementById('stat-systems').textContent = systemCount || 0;
+                document.getElementById('stat-complaints').textContent = complaintCount || 0;
+                document.getElementById('stat-resolved').textContent = resolvedCount || 0;
+            } catch (e) {
+                console.error('Stats error:', e);
+            }
+        }
+
+        async function fetchRecentComplaints() {
+            try {
+                const { data, error } = await db
+                    .from('complaints')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                const tbody = document.getElementById('recent-complaints-body');
+
+                if (error) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary">Could not load complaints.</td></tr>';
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary">No complaints yet.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(c => {
+                    const labName = c.systems && c.systems.labs ? c.systems.labs.name : 'N/A';
+                    const serialNumber = c.systems ? c.systems.serial_number : 'N/A';
+                    return `
+                        <tr>
+                            <td>${escapeHTML(labName)}</td>
+                            <td>${escapeHTML(serialNumber)}</td>
+                            <td>${escapeHTML(c.title)}</td>
+                            <td><span class="badge badge-${getPriorityClass(c.priority)}">${c.priority}</span></td>
+                            <td><span class="badge badge-${getStatusClass(c.status)}">${c.status.replace('_', ' ')}</span></td>
+                            <td>${formatDate(c.created_at)}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Complaints error:', e);
+            }
+        }
+
+        function getPriorityClass(priority) {
+            if (priority === 'critical' || priority === 'high') return 'danger';
+            if (priority === 'medium') return 'warning';
+            return 'info';
+        }
+
+        function getStatusClass(status) {
+            if (status === 'open') return 'danger';
+            if (status === 'in_progress') return 'warning';
+            if (status === 'resolved') return 'success';
+            return 'info';
+        }
+
+        // Export/Import Handlers
+        document.getElementById('export-btn').addEventListener('click', () => db.exportJSON());
+        document.getElementById('import-btn').addEventListener('click', () => document.getElementById('import-file').click());
+
+        document.getElementById('import-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                showLoader();
+                try {
+                    await db.importJSON(file);
+                    showToast('Data imported successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } catch (err) {
+                    showToast(err, 'danger');
+                } finally {
+                    hideLoader();
+                }
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

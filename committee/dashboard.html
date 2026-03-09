@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Committee Dashboard | Lab System</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/lab-grid.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .lab-section {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .lab-section-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .lab-section-header h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lab-section-body {
+            padding: 25px;
+            overflow-x: auto;
+        }
+
+        .lab-mini-grid {
+            display: inline-grid;
+            gap: 8px;
+        }
+
+        .mini-cell {
+            width: 90px;
+            height: 75px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .mini-cell:hover {
+            transform: scale(1.05);
+        }
+
+        .mini-cell .pc-icon {
+            font-size: 1.4rem;
+        }
+
+        .mini-cell .pc-serial {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .mini-cell.empty-slot {
+            opacity: 0.15;
+            cursor: default;
+            border-style: dashed;
+        }
+
+        /* Status colors */
+        .mini-cell.s-working {
+            background: rgba(0, 200, 83, 0.1);
+            border-color: rgba(0, 200, 83, 0.3);
+        }
+
+        .mini-cell.s-working .pc-serial {
+            color: var(--success);
+        }
+
+        .mini-cell.s-complaint {
+            background: rgba(255, 23, 68, 0.15);
+            border-color: rgba(255, 23, 68, 0.4);
+            animation: pulseRed 2s infinite;
+        }
+
+        .mini-cell.s-complaint .pc-serial {
+            color: var(--danger);
+        }
+
+        .mini-cell.s-in_progress {
+            background: rgba(255, 214, 0, 0.1);
+            border-color: rgba(255, 214, 0, 0.3);
+        }
+
+        .mini-cell.s-in_progress .pc-serial {
+            color: var(--warning);
+        }
+
+        .mini-cell.s-waiting {
+            background: rgba(33, 150, 243, 0.1);
+            border-color: rgba(33, 150, 243, 0.3);
+        }
+
+        .mini-cell.s-waiting .pc-serial {
+            color: var(--info);
+        }
+
+        @keyframes pulseRed {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 23, 68, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 8px 2px rgba(255, 23, 68, 0.2);
+            }
+        }
+
+        .lab-location-text {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">COMMITTEE</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item active">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="complaints.html" class="nav-item">
+                    <i data-lucide="clipboard-list" class="i-icon"></i> Complaints
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h2 class="topbar-title">Welcome, <span id="welcome-name">...</span></h2>
+                <div class="user-profile">
+                    <div class="user-avatar" id="user-initials">CM</div>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Active Issues</span>
+                            <span class="stat-value" id="stat-total">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="clipboard-list" class="i-icon"></i></div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-info">
+                            <span class="stat-label">Total Resolved</span>
+                            <span class="stat-value" id="stat-resolved">0</span>
+                        </div>
+                        <div class="stat-icon"><i data-lucide="target" class="i-icon"></i></div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="legend-bar mb-3">
+                    <div class="legend-item">
+                        <div class="legend-color color-working"></div> Working
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-complaint"></div> Complaint
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-in_progress"></div> In-Progress
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-waiting"></div> Waiting
+                    </div>
+                </div>
+
+                <div id="labs-container">
+                    <!-- Lab sections populated by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showLoader, hideLoader, escapeHTML } from '../js/utils.js';
+
+        let currentUser = null;
+
+        async function init() {
+            currentUser = await checkAuth('committee');
+            if (!currentUser) return;
+
+            document.getElementById('welcome-name').textContent = currentUser.full_name.split(' ')[0];
+            document.getElementById('user-initials').textContent = currentUser.full_name.split(' ').map(n => n[0]).join('');
+
+            fetchStats(currentUser.id);
+            fetchLabsWithSystems();
+        }
+
+        async function fetchStats() {
+            // Unresolved (Active) complaints
+            const { count: active } = await db.from('complaints').neq('status', 'resolved');
+            // Total Resolved complaints
+            const { count: resolved } = await db.from('complaints').eq('status', 'resolved');
+
+            document.getElementById('stat-total').textContent = active || 0;
+            document.getElementById('stat-resolved').textContent = resolved || 0;
+        }
+
+        async function fetchLabsWithSystems() {
+            showLoader();
+            const { data: labs } = await db.from('labs').order('name');
+
+            if (!labs || labs.length === 0) {
+                document.getElementById('labs-container').innerHTML = '<div class="text-center text-secondary mt-3">No labs found.</div>';
+                hideLoader();
+                return;
+            }
+
+            // Fetch all systems for all labs
+            const { data: allSystems } = await db.from('systems').select('*');
+
+            const container = document.getElementById('labs-container');
+            container.innerHTML = '';
+
+            labs.forEach(lab => {
+                const systems = (allSystems || []).filter(s => s.lab_id === lab.id);
+                const issueCount = systems.filter(s => s.status !== 'working').length;
+
+                // Build grid HTML
+                let gridHtml = '';
+                for (let r = 0; r < lab.total_rows; r++) {
+                    for (let c = 0; c < lab.total_cols; c++) {
+                        const sys = systems.find(s => s.position_row === r && s.position_col === c);
+                        if (sys) {
+                            const escapedSerial = escapeHTML(sys.serial_number);
+                            gridHtml += `
+                                <div class="mini-cell s-${sys.status}" title="${escapedSerial} — ${sys.status}" data-lab="${lab.id}">
+                                    <span class="pc-icon"><i data-lucide="monitor" class="i-icon"></i></span>
+                                    <span class="pc-serial">${escapedSerial}</span>
+                                </div>`;
+                        } else {
+                            gridHtml += `<div class="mini-cell empty-slot"></div>`;
+                        }
+                    }
+                }
+
+                const sectionHtml = `
+                    <div class="lab-section">
+                        <div class="lab-section-header">
+                            <h3>
+                                <i data-lucide="flask-conical" class="i-icon"></i> ${escapeHTML(lab.name)}
+                                ${issueCount > 0 ? `<span class="badge badge-danger">${issueCount} Issues</span>` : `<span class="badge badge-success">All Clear</span>`}
+                            </h3>
+                            <div>
+                                <span class="lab-location-text"><i data-lucide="map-pin" class="i-icon" style="width: 14px; height: 14px;"></i> ${escapeHTML(lab.location || '')} &nbsp;•&nbsp; ${lab.total_rows}×${lab.total_cols} Grid</span>
+                                <a href="lab-detail.html?lab_id=${lab.id}" class="btn btn-sm btn-primary" style="margin-left: 15px;">Open Full View →</a>
+                            </div>
+                        </div>
+                        <div class="lab-section-body">
+                            <div class="lab-mini-grid" style="grid-template-columns: repeat(${lab.total_cols}, 90px);">
+                                ${gridHtml}
+                            </div>
+                        </div>
+                    </div>`;
+
+                container.insertAdjacentHTML('beforeend', sectionHtml);
+            });
+            lucide.createIcons();
+
+            // Add click handlers
+            container.querySelectorAll('.mini-cell:not(.empty-slot)').forEach(cell => {
+                cell.addEventListener('click', () => {
+                    const labId = cell.dataset.lab;
+                    window.location.href = `lab-detail.html?lab_id=${labId}`;
+                });
+            });
+
+            hideLoader();
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

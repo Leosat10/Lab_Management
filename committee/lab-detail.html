@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Detail | LMS </title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/lab-grid.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">COMMITTEE</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item active">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="complaints.html" class="nav-item">
+                    <i data-lucide="clipboard-list" class="i-icon"></i> Complaints
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="flex items-center gap-2">
+                    <a href="dashboard.html" class="btn btn-sm btn-outline">← Back</a>
+                    <h2 class="topbar-title" id="lab-name-title">Lab Details</h2>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <div class="legend-bar">
+                    <div class="legend-item">
+                        <div class="legend-color color-working"></div> Working
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-complaint"></div> Complaint
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-in_progress"></div> In-Progress
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color color-waiting"></div> Waiting
+                    </div>
+                </div>
+
+                <div id="grid-container" class="grid-container">
+                    <!-- Grid rendered by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- System Status Modal -->
+    <div class="modal-overlay" id="status-modal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="modal-title">System Status</h3>
+                <button class="btn-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="complaint-info" class="mb-3" style="display: none;">
+                    <div class="alert alert-danger" style="padding: 15px;">
+                        <h4 id="complaint-title" class="mb-1">Issue Reported</h4>
+                        <p id="complaint-desc" class="mb-2 small">Description goes here...</p>
+                        <div class="flex justify-between items-center small text-secondary">
+                            <span id="complaint-meta">By: ...</span>
+                            <span id="complaint-date">...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="status-form">
+                    <div class="form-group">
+                        <label>Update System Status</label>
+                        <select id="sys-status-select" class="form-control">
+                            <option value="working">Working (All Good)</option>
+                            <option value="complaint">Complaint Reported</option>
+                            <option value="in_progress">In-Progress (Fixing)</option>
+                            <option value="waiting">Waiting (Parts/Help)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Resolution/Status Notes</label>
+                        <textarea id="status-notes" class="form-control" rows="3"
+                            placeholder="Write steps taken or current state..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancel-modal">Cancel</button>
+                <button class="btn btn-primary" id="save-status-btn">Update Status</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showToast, showLoader, hideLoader, formatDate } from '../js/utils.js';
+
+        let currentLab = null;
+        let labSystems = [];
+        let currentUser = null;
+        let activeSystem = null;
+        let activeComplaint = null;
+
+        async function init() {
+            currentUser = await checkAuth('committee');
+            if (!currentUser) return;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const labId = urlParams.get('lab_id');
+            if (labId) {
+                fetchLabData(labId);
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        async function fetchLabData(labId) {
+            showLoader();
+            const { data: lab } = await db.from('labs').eq('id', labId).single();
+            const { data: systems } = await db.from('systems').eq('lab_id', labId);
+
+            if (lab) {
+                currentLab = lab;
+                labSystems = systems || [];
+                document.getElementById('lab-name-title').textContent = lab.name;
+                renderGrid();
+            }
+            hideLoader();
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('grid-container');
+            container.style.gridTemplateColumns = `repeat(${currentLab.total_cols}, 100px)`;
+
+            let html = '';
+            for (let r = 0; r < currentLab.total_rows; r++) {
+                for (let c = 0; c < currentLab.total_cols; c++) {
+                    const system = labSystems.find(s => s.position_row === r && s.position_col === c);
+                    if (system) {
+                        html += `
+                            <div class="grid-cell occupied status-${system.status}" data-id="${system.id}">
+                                <div class="cell-icon"><i data-lucide="monitor" class="i-icon"></i></div>
+                                <div class="cell-label">${system.serial_number}</div>
+                            </div>
+                        `;
+                    } else {
+                        html += `<div class="grid-cell" style="opacity: 0.3; cursor: default;"><div class="cell-label"></div></div>`;
+                    }
+                }
+            }
+            container.innerHTML = html;
+
+            container.querySelectorAll('.grid-cell.occupied').forEach(cell => {
+                cell.addEventListener('click', () => {
+                    activeSystem = labSystems.find(s => s.id === cell.dataset.id);
+                    openStatusModal(activeSystem);
+                });
+            });
+        }
+
+        async function openStatusModal(system) {
+            showLoader();
+            document.getElementById('modal-title').textContent = `System ${system.serial_number}`;
+            document.getElementById('sys-status-select').value = system.status;
+            document.getElementById('status-notes').value = '';
+
+            const complaintDiv = document.getElementById('complaint-info');
+            complaintDiv.style.display = 'none';
+            activeComplaint = null;
+
+            // Fetch active complaint if any
+            const { data: complaints } = await db
+                .from('complaints')
+                .eq('system_id', system.id)
+                .neq('status', 'resolved')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (complaints && complaints.length > 0) {
+                activeComplaint = complaints[0];
+                complaintDiv.style.display = 'block';
+                document.getElementById('complaint-title').textContent = activeComplaint.title;
+                document.getElementById('complaint-desc').textContent = activeComplaint.description;
+                document.getElementById('complaint-meta').textContent = `By: ${activeComplaint.profiles ? activeComplaint.profiles.full_name : 'Unknown'}`;
+                document.getElementById('complaint-date').textContent = formatDate(activeComplaint.created_at);
+                document.getElementById('status-notes').value = activeComplaint.resolution_notes || '';
+            }
+
+            document.getElementById('status-modal').classList.add('active');
+            hideLoader();
+        }
+
+        async function saveStatusChange() {
+            const newStatus = document.getElementById('sys-status-select').value;
+            const notes = document.getElementById('status-notes').value;
+
+            showLoader();
+
+            // 1. Update System Status
+            const { error: sError } = await db.from('systems').update({ status: newStatus }).eq('id', activeSystem.id);
+
+            if (sError) {
+                showToast(sError.message, 'danger');
+                hideLoader();
+                return;
+            }
+
+            // 2. If there's an active complaint, update it too
+            if (activeComplaint) {
+                const complaintStatus = newStatus === 'working' ? 'resolved' : newStatus;
+                const updatePayload = {
+                    status: complaintStatus,
+                    resolution_notes: notes,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (complaintStatus === 'resolved') {
+                    updatePayload.resolved_at = new Date().toISOString();
+                }
+
+                await db.from('complaints').update(updatePayload).eq('id', activeComplaint.id);
+            }
+
+            showToast('System status updated!', 'success');
+            document.getElementById('status-modal').classList.remove('active');
+            fetchLabData(currentLab.id);
+            hideLoader();
+        }
+
+        function getPriorityClass(p) {
+            if (p === 'critical' || p === 'high') return 'danger';
+            if (p === 'medium') return 'warning';
+            return 'info';
+        }
+
+        document.getElementById('close-modal').onclick = () => document.getElementById('status-modal').classList.remove('active');
+        document.getElementById('cancel-modal').onclick = () => document.getElementById('status-modal').classList.remove('active');
+        document.getElementById('save-status-btn').onclick = saveStatusChange;
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

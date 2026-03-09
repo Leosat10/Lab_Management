@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up | Lab System Management</title>
+    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div class="auth-container">
+        <div class="auth-background-overlay"></div>
+        <!-- Auth background mesh is handled in CSS -->
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1 class="auth-title">Create Account</h1>
+                <p class="auth-subtitle">Join the Lab System Management</p>
+            </div>
+
+            <form id="signup-form">
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" class="form-control" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" class="form-control" placeholder="Choose a unique username"
+                        required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Min 6 characters"
+                        minlength="6" required>
+                </div>
+
+                <input type="hidden" name="role" id="role-student" value="student">
+
+                <div id="student-fields">
+                    <div class="form-group">
+                        <label for="rollNumber">Roll Number</label>
+                        <input type="text" id="rollNumber" class="form-control" placeholder="CS23101">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" class="form-control" placeholder="+91 9876543210">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="index.html" class="auth-link">Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { signUp } from './js/auth.js';
+
+
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullName = document.getElementById('fullName').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = 'student';
+            const rollNumber = document.getElementById('rollNumber').value;
+
+            const result = await signUp(username, password, fullName, role, rollNumber);
+            if (result.success) {
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+            }
+        });
+    </script>
+</body>
+
+</html>

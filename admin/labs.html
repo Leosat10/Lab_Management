@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Labs | LMS</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div id="loader" class="loader-container">
+        <span class="loader"></span>
+    </div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS ADMIN</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="labs.html" class="nav-item active">
+                    <i data-lucide="flask-conical" class="i-icon"></i> Labs
+                </a>
+                <a href="systems.html" class="nav-item">
+                    <i data-lucide="monitor" class="i-icon"></i> Systems
+                </a>
+                <a href="accounts.html" class="nav-item">
+                    <i data-lucide="users" class="i-icon"></i> Accounts
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div class="flex items-center">
+                    <button class="menu-toggle" id="menu-toggle"><i data-lucide="menu"></i></button>
+                    <h2 class="topbar-title">Manage Labs</h2>
+                </div>
+                <button class="btn btn-primary" id="add-lab-btn">+ Add New Lab</button>
+            </header>
+
+            <div class="content-body">
+                <div class="labs-grid" id="labs-grid">
+                    <!-- Labs cards populated by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Lab Modal -->
+    <div class="modal-overlay" id="lab-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Add New Lab</h3>
+                <button class="btn-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="lab-form">
+                    <input type="hidden" id="lab-id">
+                    <div class="form-group">
+                        <label for="lab-name">Lab Name</label>
+                        <input type="text" id="lab-name" class="form-control" placeholder="e.g. Programming Lab 1"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lab-description">Description</label>
+                        <textarea id="lab-description" class="form-control" rows="3"
+                            placeholder="Description of the lab..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="lab-location">Location</label>
+                        <input type="text" id="lab-location" class="form-control" placeholder="e.g. Block A, Room 302"
+                            required>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="lab-rows">Grid Rows (1-10)</label>
+                            <input type="number" id="lab-rows" class="form-control" min="1" max="10" value="5" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="lab-cols">Grid Cols (1-10)</label>
+                            <input type="number" id="lab-cols" class="form-control" min="1" max="10" value="6" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancel-modal">Cancel</button>
+                <button class="btn btn-primary" id="save-lab-btn">Save Lab</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showToast, showLoader, hideLoader, confirmDialog, setupMobileMenu, escapeHTML } from '../js/utils.js';
+
+        async function init() {
+            const user = await checkAuth('admin');
+            if (!user) return;
+
+            setupMobileMenu();
+            fetchLabs();
+        }
+
+        async function fetchLabs() {
+            showLoader();
+            const { data, error } = await db
+                .from('labs')
+                .select('*')
+                .order('name');
+
+            if (data) {
+                const grid = document.getElementById('labs-grid');
+                grid.innerHTML = data.map(lab => `
+                    <div class="lab-card glass">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold">${escapeHTML(lab.name)}</h3>
+                            <div class="flex gap-1">
+                                <button class="btn btn-sm btn-outline edit-btn" data-id="${lab.id}" title="Edit">
+                                    <i data-lucide="pencil" class="i-icon" style="width:14px; height:14px;"></i>
+                                    <span style="font-size: 0.75rem;">Edit</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline delete-btn" data-id="${lab.id}" title="Delete">
+                                    <i data-lucide="trash-2" class="i-icon" style="width:14px; height:14px;"></i>
+                                    <span style="font-size: 0.75rem;">Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-2">${escapeHTML(lab.description || 'No description')}</p>
+                        <div class="flex items-center gap-2 text-secondary" style="font-size: 0.85rem;">
+                            <span><i data-lucide="map-pin" class="i-icon" style="width: 14px; height: 14px;"></i> ${escapeHTML(lab.location)}</span>
+                            <span>•</span>
+                            <span>📏 ${lab.total_rows} x ${lab.total_cols} Grid</span>
+                        </div>
+                        <div class="mt-3">
+                            <a href="systems.html?lab_id=${lab.id}" class="btn btn-primary btn-sm btn-block">Manage Systems</a>
+                        </div>
+                    </div>
+                `).join('');
+
+                lucide.createIcons();
+
+                // Add event listeners
+                document.querySelectorAll('.edit-btn').forEach(btn => {
+                    btn.addEventListener('click', () => openModal(btn.dataset.id));
+                });
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', () => deleteLab(btn.dataset.id));
+                });
+            }
+            hideLoader();
+        }
+
+        const modal = document.getElementById('lab-modal');
+        const form = document.getElementById('lab-form');
+
+        function openModal(id = null) {
+            if (id) {
+                document.getElementById('modal-title').textContent = 'Edit Lab';
+                fetchLabToEdit(id);
+            } else {
+                document.getElementById('modal-title').textContent = 'Add New Lab';
+                form.reset();
+                document.getElementById('lab-id').value = '';
+            }
+            modal.classList.add('active');
+        }
+
+        async function fetchLabToEdit(id) {
+            const { data } = await db.from('labs').eq('id', id).single();
+            if (data) {
+                document.getElementById('lab-id').value = data.id;
+                document.getElementById('lab-name').value = data.name;
+                document.getElementById('lab-description').value = data.description;
+                document.getElementById('lab-location').value = data.location;
+                document.getElementById('lab-rows').value = data.total_rows;
+                document.getElementById('lab-cols').value = data.total_cols;
+            }
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        async function saveLab() {
+            const id = document.getElementById('lab-id').value;
+            const payload = {
+                name: document.getElementById('lab-name').value,
+                description: document.getElementById('lab-description').value,
+                location: document.getElementById('lab-location').value,
+                total_rows: parseInt(document.getElementById('lab-rows').value),
+                total_cols: parseInt(document.getElementById('lab-cols').value)
+            };
+
+            showLoader();
+            let result;
+            if (id) {
+                result = await db.from('labs').update(payload).eq('id', id);
+            } else {
+                result = await db.from('labs').insert(payload);
+            }
+
+            if (!result.error) {
+                showToast(`Lab ${id ? 'updated' : 'created'} successfully!`, 'success');
+                closeModal();
+                fetchLabs();
+            } else {
+                showToast(result.error.message, 'danger');
+            }
+            hideLoader();
+        }
+
+        async function deleteLab(id) {
+            if (confirmDialog('Are you sure? This will delete all systems in this lab too.')) {
+                showLoader();
+                const { error } = await db.from('labs').delete().eq('id', id);
+                if (!error) {
+                    showToast('Lab deleted successfully!', 'success');
+                    fetchLabs();
+                } else {
+                    showToast(error.message, 'danger');
+                }
+                hideLoader();
+            }
+        }
+
+        document.getElementById('add-lab-btn').addEventListener('click', () => openModal());
+        document.getElementById('close-modal').addEventListener('click', closeModal);
+        document.getElementById('cancel-modal').addEventListener('click', closeModal);
+        document.getElementById('save-lab-btn').addEventListener('click', saveLab);
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,164 @@
+/* Lab Grid Styling */
+
+.grid-container {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+    overflow-x: auto;
+    padding: 16px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+    .grid-container {
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .grid-cell {
+        width: 90px;
+        height: 90px;
+    }
+}
+
+.grid-cell {
+    width: 110px;
+    height: 110px;
+    border-radius: var(--radius-md);
+    border: 2px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    background: hsla(0, 0%, 100%, 0.02);
+}
+
+.grid-cell:hover {
+    background: hsla(0, 0%, 100%, 0.05);
+    transform: scale(1.08) translateY(-4px);
+    border-color: var(--primary);
+    z-index: 10;
+    box-shadow: var(--shadow-lg);
+}
+
+.grid-cell.occupied {
+    border-style: solid;
+}
+
+.grid-cell .cell-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    word-break: break-all;
+    padding: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.grid-cell .cell-icon {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+}
+
+/* Status Colors & Glows */
+.status-working {
+    border-color: hsla(145, 100%, 40%, 0.5);
+    background: hsla(145, 100%, 40%, 0.05);
+    box-shadow: 0 0 15px hsla(145, 100%, 40%, 0.1);
+}
+
+.status-complaint {
+    border-color: hsla(348, 100%, 55%, 0.5);
+    background: hsla(348, 100%, 55%, 0.05);
+    box-shadow: 0 0 15px hsla(348, 100%, 55%, 0.1);
+}
+
+.status-in_progress {
+    border-color: hsla(48, 100%, 50%, 0.5);
+    background: hsla(48, 100%, 50%, 0.05);
+    box-shadow: 0 0 15px hsla(48, 100%, 50%, 0.1);
+}
+
+.status-waiting {
+    border-color: hsla(207, 90%, 54%, 0.5);
+    background: hsla(207, 90%, 54%, 0.05);
+    box-shadow: 0 0 15px hsla(207, 90%, 54%, 0.1);
+}
+
+.status-working:hover {
+    box-shadow: 0 0 25px hsla(145, 100%, 40%, 0.3);
+    border-color: var(--success);
+}
+
+.status-complaint:hover {
+    box-shadow: 0 0 25px hsla(348, 100%, 55%, 0.3);
+    border-color: var(--danger);
+}
+
+.status-in_progress:hover {
+    box-shadow: 0 0 25px hsla(48, 100%, 50%, 0.3);
+    border-color: var(--warning);
+}
+
+.status-waiting:hover {
+    box-shadow: 0 0 25px hsla(207, 90%, 54%, 0.3);
+    border-color: var(--info);
+}
+
+/* Legend Bar */
+.legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 16px 24px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.color-working {
+    background: var(--success);
+    box-shadow: 0 0 10px hsla(145, 100%, 40%, 0.4);
+}
+
+.color-complaint {
+    background: var(--danger);
+    box-shadow: 0 0 10px hsla(348, 100%, 55%, 0.4);
+}
+
+.color-in_progress {
+    background: var(--warning);
+    box-shadow: 0 0 10px hsla(48, 100%, 50%, 0.4);
+}
+
+.color-waiting {
+    background: var(--info);
+    box-shadow: 0 0 10px hsla(207, 90%, 54%, 0.4);
+}

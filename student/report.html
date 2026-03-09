@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Issue | LMS</title>
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/components.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .step-container {
+            display: none;
+        }
+
+        .step-container.active {
+            display: block;
+        }
+
+        .lab-select-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .lab-card-select {
+            padding: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .lab-card-select:hover {
+            border-color: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .lab-card-select.selected {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .system-select-grid {
+            display: grid;
+            gap: 10px;
+            margin-top: 20px;
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: var(--radius);
+            overflow-x: auto;
+        }
+
+        .sys-node {
+            width: 80px;
+            height: 60px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.7rem;
+            flex-direction: column;
+        }
+
+        .sys-node.selected {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        .sys-node.has-issue {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: var(--danger);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loader" class="loader-container"><span class="loader"></span></div>
+    <div id="toast-container"></div>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo"><i data-lucide="monitor" class="i-icon"></i></span>
+                <span class="sidebar-title">LMS</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="nav-item">
+                    <i data-lucide="layout-dashboard" class="i-icon"></i> Dashboard
+                </a>
+                <a href="report.html" class="nav-item active">
+                    <i data-lucide="alert-triangle" class="i-icon"></i> Report Issue
+                </a>
+                <a href="my-complaints.html" class="nav-item">
+                    <i data-lucide="clipboard-list" class="i-icon"></i> My Reports
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="nav-item"
+                    style="width: 100%; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="log-out" class="i-icon"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <h2 class="topbar-title">Report a Problem</h2>
+            </header>
+
+            <div class="content-body">
+                <!-- Step 1: Select Lab -->
+                <div id="step-1" class="step-container active">
+                    <h3 class="mb-3">Step 1: Select the Lab</h3>
+                    <div id="lab-list" class="lab-select-grid">
+                        <!-- Labs populated -->
+                    </div>
+                </div>
+
+                <!-- Step 2: Select System -->
+                <div id="step-2" class="step-container">
+                    <div class="flex items-center gap-2 mb-3">
+                        <button class="btn btn-sm btn-outline back-btn" data-back="1">← Back</button>
+                        <h3>Step 2: Select the PC / Laptop</h3>
+                    </div>
+                    <p class="text-secondary small">Click on the system that has a problem. Red systems already have
+                        reported issues.</p>
+                    <div id="system-grid-container" class="system-select-grid">
+                        <!-- Grid populated -->
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button id="to-step-3" class="btn btn-primary" disabled>Next Step: Describe Issue →</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Describe Issue -->
+                <div id="step-3" class="step-container">
+                    <div class="flex items-center gap-2 mb-3">
+                        <button class="btn btn-sm btn-outline back-btn" data-back="2">← Back</button>
+                        <h3>Step 3: What's the problem?</h3>
+                    </div>
+                    <form id="report-form">
+                        <div class="form-group">
+                            <label>Title / Summary</label>
+                            <input type="text" id="comp-title" class="form-control"
+                                placeholder="e.g. Monitor not turning on" required>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Category</label>
+                                <select id="comp-category" class="form-control">
+                                    <option value="hardware">Hardware</option>
+                                    <option value="software">Software</option>
+                                    <option value="network">Network/Internet</option>
+                                    <option value="peripherals">Peripherals (Mouse/KB)</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Priority</label>
+                                <select id="comp-priority" class="form-control">
+                                    <option value="low">Low (Doesn't affect work)</option>
+                                    <option value="medium" selected>Medium (Affects work)</option>
+                                    <option value="high">High (Cannot work)</option>
+                                    <option value="critical">Critical (Emergency)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Detailed Description</label>
+                            <textarea id="comp-desc" class="form-control" rows="4"
+                                placeholder="Describe when it happened and exactly what is wrong..."
+                                required></textarea>
+                        </div>
+
+                        <!-- Photo upload removed as requested -->
+                        <div class="alert alert-info" style="font-size: 0.85rem; margin-top: 20px;">
+                            <strong>Note:</strong> Photo uploads are currently disabled. Please provide a clear
+                            description.
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary btn-block">Submit Report</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { checkAuth } from '../js/router.js';
+        import { signOut } from '../js/auth.js';
+        import { db } from '../js/db.js';
+        import { showToast, showLoader, hideLoader } from '../js/utils.js';
+
+        let currentUser = null;
+        let selectedLabId = null;
+        let selectedSystemId = null;
+
+        async function init() {
+            currentUser = await checkAuth('student');
+            if (!currentUser) return;
+            fetchLabs();
+        }
+
+        async function fetchLabs() {
+            showLoader();
+            const { data } = await db.from('labs').order('name');
+            const list = document.getElementById('lab-list');
+            if (data) {
+                list.innerHTML = data.map(lab => `
+                    <div class="lab-card-select" data-id="${lab.id}">
+                        <h3>${lab.name}</h3>
+                        <p class="text-secondary small">${lab.location}</p>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.lab-card-select').forEach(card => {
+                    card.onclick = () => {
+                        selectedLabId = card.dataset.id;
+                        goToStep(2);
+                        fetchSystems(selectedLabId);
+                    };
+                });
+            }
+            hideLoader();
+        }
+
+        async function fetchSystems(labId) {
+            showLoader();
+            const { data: lab } = await db.from('labs').eq('id', labId).single();
+            const { data: systems } = await db.from('systems').eq('lab_id', labId);
+
+            const grid = document.getElementById('system-grid-container');
+            grid.style.gridTemplateColumns = `repeat(${lab.total_cols}, 80px)`;
+
+            let html = '';
+            for (let r = 0; r < lab.total_rows; r++) {
+                for (let c = 0; c < lab.total_cols; c++) {
+                    const sys = systems.find(s => s.position_row === r && s.position_col === c);
+                    if (sys) {
+                        const hasIssue = sys.status !== 'working';
+                        html += `
+                            <div class="sys-node ${hasIssue ? 'has-issue' : ''}" data-id="${sys.id}" title="${sys.serial_number}">
+                                <i data-lucide="monitor" class="i-icon"></i>
+                                <span>${sys.serial_number.split('-').pop()}</span>
+                            </div>
+                        `;
+                    } else {
+                        html += `<div class="sys-node" style="opacity: 0.1; cursor: default;"></div>`;
+                    }
+                }
+            }
+            grid.innerHTML = html;
+
+            grid.querySelectorAll('.sys-node:not(.has-issue)').forEach(node => {
+                if (!node.dataset.id) return;
+                node.onclick = () => {
+                    grid.querySelectorAll('.sys-node').forEach(n => n.classList.remove('selected'));
+                    node.classList.add('selected');
+                    selectedSystemId = node.dataset.id;
+                    document.getElementById('to-step-3').disabled = false;
+                };
+            });
+            hideLoader();
+        }
+
+        function goToStep(n) {
+            document.querySelectorAll('.step-container').forEach(s => s.classList.remove('active'));
+            document.getElementById(`step-${n}`).classList.add('active');
+        }
+
+        document.querySelectorAll('.back-btn').forEach(btn => {
+            btn.onclick = () => goToStep(btn.dataset.back);
+        });
+
+        document.getElementById('to-step-3').onclick = () => goToStep(3);
+
+        document.getElementById('report-form').onsubmit = async (e) => {
+            e.preventDefault();
+            showLoader();
+
+            const payload = {
+                student_id: currentUser.id,
+                system_id: selectedSystemId,
+                title: document.getElementById('comp-title').value,
+                description: document.getElementById('comp-desc').value,
+                category: document.getElementById('comp-category').value,
+                priority: document.getElementById('comp-priority').value,
+                status: 'open'
+            };
+
+            const { data, error } = await db.from('complaints').insert(payload);
+
+            if (!error) {
+                // Update system status to 'complaint'
+                await db.from('systems').update({ status: 'complaint' }).eq('id', selectedSystemId);
+
+                showToast('Complaint submitted successfully!', 'success');
+                setTimeout(() => window.location.href = 'dashboard.html', 1500);
+            } else {
+                showToast(error.message, 'danger');
+            }
+            hideLoader();
+        };
+
+        document.getElementById('logout-btn').onclick = signOut;
+
+        init();
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
