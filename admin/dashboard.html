@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/dashboard.css">
     <link rel="stylesheet" href="../css/components.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest" defer></script>
 </head>
 
 <body>
@@ -145,19 +145,20 @@
 
         async function fetchStats() {
             try {
-                const { count: labCount } = await db.from('labs').select('*', { count: 'exact' });
-                const { count: systemCount } = await db.from('systems').select('*', { count: 'exact' });
-                const { count: complaintCount } = await db.from('complaints').eq('status', 'open').then(res => res);
-
                 const today = new Date().toISOString().split('T')[0];
-                const { count: resolvedCount } = await db.from('complaints').eq('status', 'resolved').then(res => ({
-                    count: res.data.filter(c => c.resolved_at && c.resolved_at.startsWith(today)).length
-                }));
+                const [labsRes, systemsRes, complaintsRes, resolvedRes] = await Promise.all([
+                    db.from('labs').select('*'),
+                    db.from('systems').select('*'),
+                    db.from('complaints').eq('status', 'open'),
+                    db.from('complaints').eq('status', 'resolved')
+                ]);
 
-                document.getElementById('stat-labs').textContent = labCount || 0;
-                document.getElementById('stat-systems').textContent = systemCount || 0;
-                document.getElementById('stat-complaints').textContent = complaintCount || 0;
-                document.getElementById('stat-resolved').textContent = resolvedCount || 0;
+                const resolvedToday = (resolvedRes.data || []).filter(c => c.resolved_at && c.resolved_at.startsWith(today)).length;
+
+                document.getElementById('stat-labs').textContent = (labsRes.data || []).length;
+                document.getElementById('stat-systems').textContent = (systemsRes.data || []).length;
+                document.getElementById('stat-complaints').textContent = (complaintsRes.data || []).length;
+                document.getElementById('stat-resolved').textContent = resolvedToday;
             } catch (e) {
                 console.error('Stats error:', e);
             }

@@ -32,7 +32,7 @@ export const showToast = (message, type = 'info') => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(20px)';
         setTimeout(() => toast.remove(), 300);
-    }, 50000); // 50s for better visibility during testing if needed, or stick to 5s? Plan said 5s. Sticking to 5s.
+    }, 5000);
 
     closeBtn.addEventListener('click', () => {
         clearTimeout(timeout);

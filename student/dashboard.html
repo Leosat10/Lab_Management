@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/dashboard.css">
     <link rel="stylesheet" href="../css/components.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest" defer></script>
 </head>
 
 <body>
@@ -110,7 +110,7 @@
         import { checkAuth } from '../js/router.js';
         import { signOut } from '../js/auth.js';
         import { db } from '../js/db.js';
-        import { formatDate, showToast } from '../js/utils.js';
+        import { formatDate, showToast, escapeHTML, setupMobileMenu } from '../js/utils.js';
 
         let currentUser = null;
 
@@ -126,13 +126,14 @@
         }
 
         async function fetchStats() {
-            const { count: total } = await db.from('complaints').eq('student_id', currentUser.id);
-            const { count: pending } = await db.from('complaints').eq('student_id', currentUser.id).neq('status', 'resolved');
-            const { count: resolved } = await db.from('complaints').eq('student_id', currentUser.id).eq('status', 'resolved');
-
-            document.getElementById('stat-total').textContent = total || 0;
-            document.getElementById('stat-pending').textContent = pending || 0;
-            document.getElementById('stat-resolved').textContent = resolved || 0;
+            const [totalRes, pendingRes, resolvedRes] = await Promise.all([
+                db.from('complaints').eq('student_id', currentUser.id),
+                db.from('complaints').eq('student_id', currentUser.id).neq('status', 'resolved'),
+                db.from('complaints').eq('student_id', currentUser.id).eq('status', 'resolved')
+            ]);
+            document.getElementById('stat-total').textContent = (totalRes.data || []).length;
+            document.getElementById('stat-pending').textContent = (pendingRes.data || []).length;
+            document.getElementById('stat-resolved').textContent = (resolvedRes.data || []).length;
         }
 
         async function fetchRecentUpdates() {

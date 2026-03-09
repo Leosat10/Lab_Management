@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="../css/dashboard.css">
     <link rel="stylesheet" href="../css/lab-grid.css">
     <link rel="stylesheet" href="../css/components.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest" defer></script>
     <style>
         .lab-section {
             background: var(--bg-card);
@@ -239,13 +239,12 @@
         }
 
         async function fetchStats() {
-            // Unresolved (Active) complaints
-            const { count: active } = await db.from('complaints').neq('status', 'resolved');
-            // Total Resolved complaints
-            const { count: resolved } = await db.from('complaints').eq('status', 'resolved');
-
-            document.getElementById('stat-total').textContent = active || 0;
-            document.getElementById('stat-resolved').textContent = resolved || 0;
+            const [activeRes, resolvedRes] = await Promise.all([
+                db.from('complaints').neq('status', 'resolved'),
+                db.from('complaints').eq('status', 'resolved')
+            ]);
+            document.getElementById('stat-total').textContent = (activeRes.data || []).length;
+            document.getElementById('stat-resolved').textContent = (resolvedRes.data || []).length;
         }
 
         async function fetchLabsWithSystems() {

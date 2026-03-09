@@ -36,7 +36,11 @@ export const signIn = async (username, password) => {
         });
 
         if (error) throw error;
-        return { success: true, role: data.user.role };
+
+        // In cloud mode, role lives in the profiles table (fetched into db.currentUser).
+        // In local mode, data.user IS the profile and already has role.
+        const role = data.user?.role || db.currentUser?.role;
+        return { success: true, role };
     } catch (error) {
         showToast(error.message, 'danger');
         return { success: false };

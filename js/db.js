@@ -219,7 +219,18 @@ class Database {
                     const { data: profile } = await supabase.from('profiles').select('*').eq('id', res.data.user.id).single();
                     this.currentUser = profile;
                     localStorage.setItem('lab_system_user', JSON.stringify(profile));
+                    return res;
                 }
+                // Supabase user doesn't exist yet — fall back to local profiles (e.g. built-in AdminCSE)
+                const localData = this._loadLocal();
+                const hashedPassword = await hashPassword(password);
+                const profile = localData.profiles.find(p => p.username === username && p.password === hashedPassword);
+                if (profile) {
+                    this.currentUser = profile;
+                    localStorage.setItem('lab_system_user', JSON.stringify(profile));
+                    return { data: { user: profile }, error: null };
+                }
+                // Return the original Supabase error
                 return res;
             }
 
@@ -244,7 +255,14 @@ class Database {
             return { error: null };
         },
         getUser: async () => {
-            if (this.isCloud) return supabase.auth.getUser();
+            if (this.isCloud) {
+                const supaRes = await supabase.auth.getUser();
+                // If Supabase has a real session, use it
+                if (supaRes.data?.user) return supaRes;
+                // Otherwise fall back to the locally-stored profile (e.g. AdminCSE fallback login)
+                const stored = JSON.parse(localStorage.getItem('lab_system_user')) || null;
+                return { data: { user: stored }, error: null };
+            }
             return { data: { user: this.currentUser }, error: null };
         }
     };
