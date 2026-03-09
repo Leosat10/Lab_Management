@@ -1,20 +1,20 @@
 {
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/admin/(.*)",
-      "destination": "/admin/$1.html"
-    },
-    {
-      "source": "/committee/(.*)",
-      "destination": "/committee/$1.html"
-    },
-    {
-      "source": "/student/(.*)",
-      "destination": "/student/$1.html"
-    }
-  ]
+    "rewrites": [
+        {
+            "source": "/",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/admin/(.*)",
+            "destination": "/admin/$1.html"
+        },
+        {
+            "source": "/committee/(.*)",
+            "destination": "/committee/$1.html"
+        },
+        {
+            "source": "/student/(.*)",
+            "destination": "/student/$1.html"
+        }
+    ]
 }
